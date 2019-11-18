@@ -16,11 +16,13 @@ class Cliente(threading.Thread):
         while self.conn:
             if self.peer == None:
                 print("El cliente debe seleccionar con quien chatear")
-                self.conn.send(str(names)[1:-1].encode())
+                nombres = str(names)
+                conn.send(nombres.encode())
                 print("Seleccionando chat")
                 peer = self.conn.recv(1024).decode()
-                if clientes[peer][0].peer != None:
+                if clientes[peer][0].peer == None:
                     self.peer = clientes[peer][0]
+                    clientes[peer][0].peer = self
                     self.conn.send("yes".encode())
                     print("Cliente seleccionado")
                 else:
@@ -45,11 +47,8 @@ if __name__ == "__main__":
         print("En espera de conexión...")
         conn, addr = s.accept()
         print("Nueva conexión establecida")
-        nombres = str(names)[1:-1]
-        if nombres != "":
-            conn.send(nombres.encode())
-        else:
-            conn.send("nothing".encode())
+        nombres = str(names)
+        conn.send(nombres.encode())
         print("Seleccionando nombre...")
         name = conn.recv(1024).decode()
         print("Nombre seleccionado.")

@@ -3,7 +3,7 @@ import threading
 
 class listener(threading.Thread):
     def __init__(self, sock):
-        super(Cliente, self).__init__()
+        super(listener, self).__init__()
         self.sock = sock
 
     def run(self):
@@ -15,8 +15,8 @@ s = socket.socket()
 s.connect(("localhost", 8000))
 name = ""
 peer = ""
-names = s.recv(1024).decode().split(", ")
 while True:
+    names = s.recv(1024).decode()[1:-1].split(", ")
     while name == "":
         name = input("Ingrese un nombre para regitrarse: ")
     if not repr(name) in names:
@@ -26,8 +26,8 @@ while True:
     else:
         print("Nombre en uso, elija otro.")
 
-names = s.recv(1024).decode().split(", ")
 while True:
+    names = s.recv(1024).decode()[1:-1].split(", ")
     for n in names:
         if n[1:-1] != name:
             print (n[1:-1])
