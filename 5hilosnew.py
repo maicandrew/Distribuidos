@@ -20,11 +20,17 @@ class Cliente(threading.Thread):
                 conn.send(nombres.encode())
                 print("Seleccionando chat")
                 peer = self.conn.recv(1024).decode()
-                if clientes[peer][0].peer == None:
-                    self.peer = clientes[peer][0]
-                    clientes[peer][0].peer = self
-                    self.conn.send("yes".encode())
-                    print("Cliente seleccionado")
+                peer = clientes[peer][0]
+                if peer.peer == None:
+                    peer.conn.send(self.name)
+                    r = peer.conn.recv(1024)
+                    if r == "yes":
+                        self.peer = clientes[peer][0]
+                        clientes[peer][0].peer = self
+                        self.conn.send("yes".encode())
+                        print("Cliente seleccionado")
+                    else:
+                        print("El cliente rechazó la conexión")
                 else:
                     self.conn.send("no".encode())
             else:
