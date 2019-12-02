@@ -151,8 +151,8 @@ def exitRoom(user):
     sala = user.room
     if sala.name != "default":
         sala.users.remove(user)
-        user.room(salas["default"])
-        sala["default"].users.append(user)
+        user.room = salas["default"]
+        salas["default"].users.append(user)
         user.conn.send("Saliendo a la sala por defecto".encode())
 
 def exitClient(user):
