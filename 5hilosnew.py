@@ -15,37 +15,38 @@ class Room(threading.Thread):
     def run(self):
         while len(self.users) > 0:
             for user in self.users:
-                if user.message != "":
-                    if user.priv == None:
-                        cad = user.name+": "+user.message
-                        self.send(cad.encode())
-                    else:
-                        cad = "/private "+user.name+": "+user.message
-                        user.priv.conn.send(cad.encode())
-                        user.priv = None
-                    user.message = ""
-                if user.command != "":
-                    comm = user.command
-                    if comm.startswith("#cR "):
-                        createRoom(comm[4:], user)
-                    elif comm.startswith("#gR "):
-                        getRoom(comm[4:], user)
-                    elif comm == "#eR":
-                        exitRoom(user)
-                    elif comm == "exit":
-                        exitClient(user)
-                    elif comm == "#lR":
-                        listRooms(user)
-                    elif comm.startswith("#dR "):
-                        deleteRoom(comm[4:], user)
-                    elif comm == "#show users":
-                        getUsuarios(user)
-                    elif comm.startswith("#/private "):
-                        sendPrivate(comm[10:], user)
-                    else:
-                        user.conn.send("Comando no reconocido".encode())
-                    user.command = ""
-                    #condicional para comandos
+                if user != None:
+                    if user.message != "":
+                        if user.priv == None:
+                            cad = user.name+": "+user.message
+                            self.send(cad.encode())
+                        else:
+                            cad = "/private "+user.name+": "+user.message
+                            user.priv.conn.send(cad.encode())
+                            user.priv = None
+                        user.message = ""
+                    if user.command != "":
+                        comm = user.command
+                        if comm.startswith("#cR "):
+                            createRoom(comm[4:], user)
+                        elif comm.startswith("#gR "):
+                            getRoom(comm[4:], user)
+                        elif comm == "#eR":
+                            exitRoom(user)
+                        elif comm == "exit":
+                            exitClient(user)
+                        elif comm == "#lR":
+                            listRooms(user)
+                        elif comm.startswith("#dR "):
+                            deleteRoom(comm[4:], user)
+                        elif comm == "#show users":
+                            getUsuarios(user)
+                        elif comm.startswith("#/private "):
+                            sendPrivate(comm[10:], user)
+                        else:
+                            user.conn.send("Comando no reconocido".encode())
+                        user.command = ""
+                        #condicional para comandos
         print("Sala", self.name, "vacía. Cerrando sala")
 
     def send(self, message):
@@ -53,7 +54,7 @@ class Room(threading.Thread):
             user.conn.send(message.encode())
 
 class Cliente(threading.Thread):
-    def __init__(self, conn, addr, name, room = "default"):
+    def __init__(self, conn, addr, name = ""):
         super(Cliente, self).__init__()
         self.conn = conn
         self.addr = addr
@@ -61,20 +62,61 @@ class Cliente(threading.Thread):
         self.message = ""
         self.command = ""
         self.priv = None
-        self.room = room
+        self.room = None
 
     def run(self):
-        while self.conn:
-            data = self.conn.recv(1024).decode()
-            if data:
-                if data.startswith("#"):
-                    self.command = data
-                else:
-                    self.message = data
+        while True:
+            if self.name == "":
+                data = self.conn.recv(1024).decode()
+                if data == "#mode:register":
+                    valid = True
+                    while valid:
+                        nombrer = self.conn.recv(1024).decode()
+                        #Comprobar en la base de datos si el usuario ya existe
+                        #if not nombre in DB:
+                            #valid = False
+                        self.conn.send(str(valid).encode())
+                    nombres = self.conn.recv(1024).decode()
+                    apellidos = self.conn.recv(1024).decode()
+                    usuario = self.conn.recv(1024).decode()
+                    password = self.conn.recv(1024).decode()
+                    edad = self.conn.recv(1024).decode()
+                    genero = self.conn.recv(1024).decode()
+                    #Insertar en la base de datos
+                elif data == "#mode:login":
+                    invalid = True
+                    while invalid:
+                        nombrel = self.conn.recv(1024).decode()
+                        #Comprobar en la base de datos si el usuario ya existe
+                        #if nombre in DB:
+                            #invalid = False
+                        self.conn.send(str(invalid).encode())
+                    passw = True
+                    while passw:
+                        contrasena = self.conn.recv(1024).decode()
+                        #Comprobar en la base de datos si el usuario ya existe
+                        #if contrasena in DB with usuario:
+                            #passw = False
+                        self.conn.send(str(passw).encode())
+                    username = self.conn.recv(1024).decode()
+                    self.name = username
+                    self.log()
             else:
-                break
-        print("Sesión finalizada:",self.name, self.addr)
-        clientes[self.addr][1] = 0
+                while self.conn:
+                    data = self.conn.recv(1024).decode()
+                    if data:
+                        if data.startswith("#"):
+                            self.command = data
+                        else:
+                            self.message = data
+                    else:
+                        break
+                print("Sesión finalizada:",self.name, self.addr)
+
+    def log(self):
+        clientes[self.name] = self
+        self.room = salas["default"]
+        self.room.users.append(self)
 
     def join(self):
         self.conn.send("Cerrando conexión".encode())
@@ -87,11 +129,13 @@ def createRoom(name, user = None):
         sala = Room(name, user)
         sala.start()
         salas[name] = sala
-        user.room = sala
         cad = "Sala creada: "+name
-        user.conn.send(cad.encode())
+        if user != None:
+            user.room = sala
+            user.conn.send(cad.encode())
     else:
-        user.conn.send("Error al intentar crear la sala".encode())
+        if user != None:
+            user.conn.send("Error al intentar crear la sala".encode())
 
 def getRoom(name, user):
     if name in salas:
@@ -154,32 +198,17 @@ def getUsuarios(user):
 def sendPrivate(target, source):
     if target in clientes:
         source.priv = clientes[target]
+    else:
+        source.send("El usuario al que intenta enviar el mensaje no se encuentra en linea".encode())
 
 if __name__ == "__main__":
     s = socket()
     s.bind(("localhost", 8000))
     s.listen(5)
     createRoom("default")
-    """
     while True:
         print("En espera de conexión...")
         conn, addr = s.accept()
-        print("Nueva conexión establecida")
-        nombres = str(names)
-        conn.send(nombres.encode())
-        print("Seleccionando nombre...")
-        name = conn.recv(1024).decode()
-        print("Nombre seleccionado.")
-        names.append(name)
-        c = Cliente(conn, addr, name)
-        clientes[name]=[c, 1]
-        c.start()
-        print("Corrió")
-        for i in clientes:
-            if clientes[i][1] == 0:
-                names.pop(names.index(i))
-                clientes[i][0].join()
-                clientes.pop(i)
-                print(clientes)
-                break
-    """
+        print("Cliente conectado")
+        client = Cliente(conn,addr)
+        client.start()

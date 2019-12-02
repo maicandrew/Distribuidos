@@ -1,5 +1,6 @@
 import socket
 import threading
+import hashlib
 
 class listener(threading.Thread):
     def __init__(self, sock):
@@ -11,10 +12,77 @@ class listener(threading.Thread):
             message = self.sock.recv(1024)
             print(message)
 
+def encrypt_string(hash_string):
+    sha_signature = hashlib.sha256(hash_string.encode()).hexdigest()
+    return sha_signature
+
+def espacios(st):
+    while st.startswith(" "):
+        st = st[1:]
+    while st.endswith(" "):
+        st = st[:-1]
+    return st
+
 def login(s):
-    return 0
-#    while True:
-#        pass
+    password = ""
+    usuario = espacios(input("Usuario: "))
+    while usuario == "":
+            usuario = espacios(input("Usuario: "))
+    if not newUser(s, usuario):
+        while True:
+            password = espacios(input("Contraseña: "))
+            while password == "":
+                password = espacios(input("Contraseña: "))
+            password = encrypt_string(password)
+            if not newUser(s, password):
+                s.send(usuario.encode())
+                return True
+            else:
+                print("La contraseña que está usando no es correcta.")
+    else:
+        print("El usuario con el que intenta ingresar no está registrado.")
+        return False
+
+def newUser(s, username):
+    s.send(username.encode())
+    r = s.recv(1024).decode()
+    return bool(r)
+
+def register(s):
+    while True:
+        usuario = espacios(input("Usuario: "))
+        while usuario == "":
+                usuario = espacios(input("Usuario: "))
+        if newUser(s, usuario):
+            print("Al parecer alguien ha usado ese nombre antes, intenta con otro.")
+        else:
+            break
+    nombres = espacios(input("Nombres: "))
+    while nombres == "":
+        nombres = espacios(input("Nombres: "))
+    apellidos = espacios(input("Apellidos: "))
+    while apellidos == "":
+        apellidos = espacios(input("Apellidos: "))
+    password = espacios(input("Contraseña: "))
+    while password == "":
+        password = espacios(input("Contraseña: "))
+    edad = espacios(input("Edad: "))
+    while True:
+        try:
+            int(edad)
+            break
+        except:
+            edad = espacios(input("Edad: "))
+    genero = espacios(input("Genero(F/M): "))
+    while genero != "F" and genero != "M":
+        genero = espacios(input("Genero(F/M): "))
+    password = encrypt_string(password)
+    s.send(nombres.encode())
+    s.send(apellidos.encode())
+    s.send(usuario.encode())
+    s.send(password.encode())
+    s.send(edad.encode())
+    s.send(genero.encode())
 
 def name_select(s, name):
     while True:
@@ -48,21 +116,37 @@ def peer_select(s):
         else:
             print("Nombre inválido")
 
+def menu(s):
+    while True:
+        print("1. Iniciar sesión")
+        print("2. Registrarse")
+        print("3. Salir")
+        op = espacios(input("Seleccione una opción: "))
+        if op == "1":
+            s.send("#mode:login".encode())
+            if login(s):
+                 return True
+        elif op == "2":
+            s.send("#mode:register".encode())
+            register(s)
+            print("Registro completado con exito. Volviendo al menu principal...")
+        else:
+            return None
 
 if __name__ == "__main__":
     s = socket.socket()
     s.connect(("localhost", 8000))
     name = ""
     peer = ""
-    name = login(s)
-    while True:
-        l = listener(s)
-        l.start()
-        a = input(name)
-        while a == "":
-            a = input(name)
-        s.send(a.encode())
-        print(a)
-        if a == "s":
-            s.close()
-            break
+    x = menu(s)
+    if x != None:
+        while True:
+            l = listener(s)
+            l.start()
+            a = input(">")
+            while a == "":
+                a = input(">")
+            s.send(a.encode())
+            if a == "s":
+                s.close()
+                break
