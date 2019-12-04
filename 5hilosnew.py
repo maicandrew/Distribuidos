@@ -1,5 +1,10 @@
 import threading
+import pymongo
 from socket import socket, error
+uri  = "***REMOVED***"
+client = pymongo.MongoClient(uri)
+db = client.App
+DBUsers = db.Users
 clientes = {}
 salas = {}
 #import time
@@ -19,7 +24,7 @@ class Room(threading.Thread):
                     if user.message != "":
                         if user.priv == None:
                             cad = user.name+": "+user.message
-                            self.send(cad.encode())
+                            self.send(cad)
                         else:
                             cad = "/private "+user.name+": "+user.message
                             user.priv.conn.send(cad.encode())
@@ -33,7 +38,7 @@ class Room(threading.Thread):
                             getRoom(comm[4:], user)
                         elif comm == "#eR":
                             exitRoom(user)
-                        elif comm == "exit":
+                        elif comm == "#exit":
                             exitClient(user)
                         elif comm == "#lR":
                             listRooms(user)
@@ -51,7 +56,8 @@ class Room(threading.Thread):
 
     def send(self, message):
         for user in self.users:
-            user.conn.send(message.encode())
+            if user != None:
+                user.conn.send(message.encode())
 
 class Cliente(threading.Thread):
     def __init__(self, conn, addr, name = ""):
@@ -73,8 +79,9 @@ class Cliente(threading.Thread):
                     while valid:
                         nombrer = self.conn.recv(1024).decode()
                         #Comprobar en la base de datos si el usuario ya existe
-                        #if not nombre in DB:
-                            #valid = False
+                        cant = DBUsers.find_one({"username": nombrer})
+                        if cant == None:
+                            valid = False
                         self.conn.send(str(valid).encode())
                     nombres = self.conn.recv(1024).decode()
                     apellidos = self.conn.recv(1024).decode()
@@ -83,20 +90,36 @@ class Cliente(threading.Thread):
                     edad = self.conn.recv(1024).decode()
                     genero = self.conn.recv(1024).decode()
                     #Insertar en la base de datos
+                    try:
+                        if usuario != "":
+                            a = DBUsers.insert_one({"username": usuario, "nombres": nombres,
+                                            "apellidos": apellidos, "password":password,
+                                            "edad": edad, "genero": genero})
+                            print("Usuario nuevo registrado:",a.inserted_id)
+                    except:
+                        print("Error al insertar en la base de datos")
                 elif data == "#mode:login":
+                    document = None
                     invalid = True
                     while invalid:
-                        nombrel = self.conn.recv(1024).decode()
+                        try:
+                            nombrel = self.conn.recv(1024).decode()
+                        except:
+                            break
                         #Comprobar en la base de datos si el usuario ya existe
-                        #if nombre in DB:
-                            #invalid = False
+                        document = DBUsers.find_one({"username": nombrel})
+                        if document != None:
+                            invalid = False
                         self.conn.send(str(invalid).encode())
                     passw = True
                     while passw:
-                        contrasena = self.conn.recv(1024).decode()
+                        try:
+                            contrasena = self.conn.recv(1024).decode()
+                        except:
+                            break
                         #Comprobar en la base de datos si el usuario ya existe
-                        #if contrasena in DB with usuario:
-                            #passw = False
+                        if contrasena == document["password"]:
+                            passw = False
                         self.conn.send(str(passw).encode())
                     username = self.conn.recv(1024).decode()
                     self.name = username
@@ -131,6 +154,7 @@ def createRoom(name, user = None):
         salas[name] = sala
         cad = "Sala creada: "+name
         if user != None:
+            user.room.users.remove(user)
             user.room = sala
             user.conn.send(cad.encode())
     else:
@@ -141,6 +165,7 @@ def getRoom(name, user):
     if name in salas:
         sala = salas[name]
         sala.users.append(user)
+        user.room.users.remove(user)
         user.room = sala
         cad = "Conectado a "+name
         user.conn.send(cad.encode())
@@ -176,13 +201,17 @@ def listRooms(user):
 def deleteRoom(name, user):
     if name in salas:
         sala = salas[name]
-        if sala.owner == user.name:
-            for u in sala.users:
-                exitRoom(u)
-            cad = "Sala " + name + " borrada"
-            user.conn.send(cad.encode())
+        if name != "default":
+            if sala.owner.name == user.name:
+                for u in sala.users:
+                    exitRoom(u)
+                cad = "Sala " + name + " borrada"
+                user.conn.send(cad.encode())
+            else:
+                cad = "No eres el dueño de la sala "+name
+                user.conn.send(cad.encode())
         else:
-            cad = "No eres el dueño de la sala "+name
+            cad = "No puedes borrar la sala por defecto"
             user.conn.send(cad.encode())
     else:
         cad = "Error al intentar borrar la sala "+name
@@ -190,8 +219,8 @@ def deleteRoom(name, user):
 
 def getUsuarios(user):
     cad = ""
-    for user in clientes:
-        cad += user+"\n"
+    for u in clientes:
+        cad += u+"\n"
     cad = cad[:-1]
     user.conn.send(cad.encode())
 
@@ -199,7 +228,7 @@ def sendPrivate(target, source):
     if target in clientes:
         source.priv = clientes[target]
     else:
-        source.send("El usuario al que intenta enviar el mensaje no se encuentra en linea".encode())
+        source.conn.send("El usuario al que intenta enviar el mensaje no se encuentra en linea".encode())
 
 if __name__ == "__main__":
     s = socket()

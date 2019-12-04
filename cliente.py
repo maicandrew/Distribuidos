@@ -1,6 +1,7 @@
 import socket
 import threading
 import hashlib
+from time import sleep
 
 class listener(threading.Thread):
     def __init__(self, sock):
@@ -9,7 +10,7 @@ class listener(threading.Thread):
 
     def run(self):
         while self.sock:
-            message = self.sock.recv(1024)
+            message = self.sock.recv(1024).decode()
             print(message)
 
 def encrypt_string(hash_string):
@@ -28,13 +29,13 @@ def login(s):
     usuario = espacios(input("Usuario: "))
     while usuario == "":
             usuario = espacios(input("Usuario: "))
-    if not newUser(s, usuario):
+    if newUser(s, usuario) == "False":
         while True:
             password = espacios(input("Contraseña: "))
             while password == "":
                 password = espacios(input("Contraseña: "))
             password = encrypt_string(password)
-            if not newUser(s, password):
+            if newUser(s, password) == "False":
                 s.send(usuario.encode())
                 return True
             else:
@@ -46,14 +47,15 @@ def login(s):
 def newUser(s, username):
     s.send(username.encode())
     r = s.recv(1024).decode()
-    return bool(r)
+    return r
 
 def register(s):
+    usuario = ""
     while True:
         usuario = espacios(input("Usuario: "))
         while usuario == "":
                 usuario = espacios(input("Usuario: "))
-        if newUser(s, usuario):
+        if newUser(s, usuario) == "True":
             print("Al parecer alguien ha usado ese nombre antes, intenta con otro.")
         else:
             break
@@ -78,10 +80,15 @@ def register(s):
         genero = espacios(input("Genero(F/M): "))
     password = encrypt_string(password)
     s.send(nombres.encode())
+    sleep(0.2)
     s.send(apellidos.encode())
+    sleep(0.2)
     s.send(usuario.encode())
+    sleep(0.2)
     s.send(password.encode())
+    sleep(0.2)
     s.send(edad.encode())
+    sleep(0.2)
     s.send(genero.encode())
 
 def name_select(s, name):
