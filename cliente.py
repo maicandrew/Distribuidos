@@ -7,11 +7,18 @@ class listener(threading.Thread):
     def __init__(self, sock):
         super(listener, self).__init__()
         self.sock = sock
+        self.stop = False
 
     def run(self):
-        while self.sock:
-            message = self.sock.recv(1024).decode()
-            print(message)
+        while not self.stop:
+            try:
+                message = self.sock.recv(1024)
+            except ConnectionAbortedError:
+                print("Desconectado")
+                self.stop = True
+            if not self.stop:
+                message = message.decode()
+                print(message)
 
 def encrypt_string(hash_string):
     sha_signature = hashlib.sha256(hash_string.encode()).hexdigest()
@@ -91,69 +98,44 @@ def register(s):
     sleep(0.2)
     s.send(genero.encode())
 
-def name_select(s, name):
-    while True:
-        names = s.recv(1024).decode()[1:-1].split(", ")
-        while name == "":
-            name = input("Ingrese un nombre para regitrarse: ")
-        if not repr(name) in names:
-            print("Nombre válido.")
-            s.send(name.encode())
-            return name
-        else:
-            print("Nombre en uso, elija otro.")
-
-def peer_select(s):
-    while True:
-        names = s.recv(1024).decode()[1:-1].split(", ")
-        for n in names:
-            if n[1:-1] != name:
-                print (n[1:-1])
-        peer = input("Seleccione con quien chatear: ")
-        while peer == "":
-            peer = input("Seleccione con quien chatear: ")
-        if repr(peer) in names:
-            s.send(peer.encode())
-            r = s.recv(10).decode()
-            if r == "yes":
-                print("Chat seleccionado")
-                break
-            else:
-                print("El usuario ya se encuentra conectado con alguien más. Intente con otro nombre")
-        else:
-            print("Nombre inválido")
-
 def menu(s):
     while True:
-        print("1. Iniciar sesión")
-        print("2. Registrarse")
-        print("3. Salir")
-        op = espacios(input("Seleccione una opción: "))
-        if op == "1":
-            s.send("#mode:login".encode())
-            if login(s):
-                 return True
-        elif op == "2":
-            s.send("#mode:register".encode())
-            register(s)
-            print("Registro completado con exito. Volviendo al menu principal...")
-        else:
+        try:
+            print("1. Iniciar sesión")
+            print("2. Registrarse")
+            print("3. Salir")
+            op = espacios(input("Seleccione una opción: "))
+            if op == "1":
+                s.send("#mode:login".encode())
+                if login(s):
+                    return True
+            elif op == "2":
+                s.send("#mode:register".encode())
+                register(s)
+                print("Registro completado con exito. Volviendo al menu principal...")
+            else:
+                return None
+        except KeyboardInterrupt:
             return None
 
 if __name__ == "__main__":
     s = socket.socket()
     s.connect(("localhost", 8000))
-    name = ""
-    peer = ""
     x = menu(s)
     if x != None:
+        l = listener(s)
+        l.start()
         while True:
-            l = listener(s)
-            l.start()
-            a = input(">")
-            while a == "":
+            try:
                 a = input(">")
-            s.send(a.encode())
-            if a == "s":
-                s.close()
+                while a == "":
+                    a = input(">")
+                if a != "#exit":
+                    s.send(a.encode())
+                else:
+                    raise KeyboardInterrupt
+            except KeyboardInterrupt:
+                l.sock.close()
+                l.stop = True
+                l.join()
                 break
