@@ -146,6 +146,7 @@ class Cliente(threading.Thread):
                         data = self.conn.recv(1024)
                     except (ConnectionResetError, ConnectionAbortedError):
                         print("Sesión finalizada:",self.name, self.addr)
+                        self.command = "#exit"
                         return False
                     if data:
                         data  = data.decode()
@@ -167,7 +168,29 @@ class Cliente(threading.Thread):
         self.name = ""
         self.room = None
         threading.Thread.join(self)
+"""
+def getAverageClockDiff(): 
+    clientes_copia = clientes.copy()
+    time_difference_list = list(client['time_difference']  
+                                for client_addr, client  
+                                    in client_data.items())
+    sum_of_clock_difference = sum(time_difference_list, datetime.timedelta(0, 0)) 
+    average_clock_difference = sum_of_clock_difference / len(client_data) 
+    return  average_clock_difference
 
+def synchronizeAllClocks():
+    while True: 
+        if len(client_data) > 0:
+            average_clock_difference = getAverageClockDiff()
+            for client_addr, client in client_data.items():
+                try:
+                    synchronized_time = datetime.datetime.now() + average_clock_difference
+                    client['connector'].send(str(synchronized_time).encode())
+                except Exception as e: 
+                    print("Something went wrong while sending synchronized time through " + str(client_addr))
+        else : 
+            print("No client data. Synchronization not applicable.")
+"""
 def espacios(st):
     while st.startswith(" "):
         st = st[1:]
@@ -284,7 +307,7 @@ def sendPrivate(target, source):
 if __name__ == "__main__":
     s = socket()
     s.bind(("localhost", 8000))
-    s.listen(5)
+    s.listen(10)
     createRoom("default")
     try:
         while True:

@@ -1,7 +1,8 @@
 import socket
+import datetime
 import threading
 import hashlib
-from time import sleep
+from time import sleep, time
 
 class listener(threading.Thread):
     def __init__(self, sock):
@@ -18,7 +19,10 @@ class listener(threading.Thread):
                 self.stop = True
             if not self.stop:
                 message = message.decode()
-                print(message)
+                if message == "#time":
+                    self.sock.send(str("#time " + str(datetime.datetime.now())).encode())
+                else:
+                    print(message)
 
 def encrypt_string(hash_string):
     sha_signature = hashlib.sha256(hash_string.encode()).hexdigest()
